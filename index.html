@@ -1,86 +1,61 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>IPA Flow Builder — React Flow v10 (Stable)</title>
+export function parseToFlow(text) {
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-  <!-- React Flow v10 CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/react-flow-renderer@10.3.17/dist/style.css" />
+  let nodes = [];
+  let edges = [];
+  let lastDecision = null;
+  let lastNode = null;
 
-  <!-- React 18 UMD -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  lines.forEach((line, i) => {
+    const id = String(i);
 
-  <!-- ✅ React Flow v10 UMD (stable global: window.ReactFlow) -->
-  <script src="https://unpkg.com/react-flow-renderer@10.3.17/dist/umd/index.js"></script>
-
-  <style>
-    html, body, #root { height: 100%; margin: 0; }
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #f8fafc;
+    if (line === "START") {
+      nodes.push({ id, type: "start", data: { label: "Start" } });
+      lastNode = id;
+      return;
     }
-  </style>
-</head>
-<body>
-<div id="root"></div>
 
-<script>
-(function () {
-  const React = window.React;
-  const ReactDOM = window.ReactDOM;
-  const RF = window.ReactFlow;
+    if (line === "END") {
+      nodes.push({ id, type: "end", data: { label: "End" } });
+      edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+      return;
+    }
 
-  if (!React || !ReactDOM || !RF) {
-    document.getElementById('root').innerHTML = '<div style="padding:16px;color:#b91c1c">React Flow v10 failed to load.</div>';
-    return;
-  }
+    if (line.startsWith("PROCESS:")) {
+      const label = line.replace("PROCESS:", "").trim();
+      nodes.push({ id, type: "process", data: { label } });
+      if (lastNode) edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+      lastNode = id;
+      return;
+    }
 
-  const h = React.createElement;
+    if (line.startsWith("DECISION:")) {
+      const label = line.replace("DECISION:", "").trim();
+      nodes.push({ id, type: "decision", data: { label } });
+      if (lastNode) edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+      lastDecision = id;
+      lastNode = id;
+      return;
+    }
 
-  const {
-    ReactFlow,
-    Controls,
-    MiniMap,
-    Background,
-    addEdge,
-    useNodesState,
-    useEdgesState
-  } = RF;
+    if (line.startsWith("YES:")) {
+      const label = line.replace("YES:", "").trim();
+      const nid = id + "y";
+      nodes.push({ id: nid, type: "process", data: { label } });
+      edges.push({ id: `yes-${nid}`, source: lastDecision, target: nid, label: "YES" });
+      return;
+    }
 
-  function App() {
-    const [nodes, , onNodesChange] = useNodesState([
-      { id: '1', data: { label: 'Start' }, position: { x: 100, y: 100 }, type: 'input' },
-      { id: '2', data: { label: 'Interview' }, position: { x: 350, y: 100 } },
-      { id: '3', data: { label: 'Decision' }, position: { x: 600, y: 100 } }
-    ]);
+    if (line.startsWith("NO:")) {
+      const label = line.replace("NO:", "").trim();
+      const nid = id + "n";
+      nodes.push({ id: nid, type: "process", data: { label } });
+      edges.push({ id: `no-${nid}`, source: lastDecision, target: nid, label: "NO" });
+      return;
+    }
 
-    const [edges, setEdges, onEdgesChange] = useEdgesState([
-      { id: 'e1-2', source: '1', target: '2', type: 'smoothstep' },
-      { id: 'e2-3', source: '2', target: '3', type: 'smoothstep' }
-    ]);
+    throw new Error(`Invalid syntax: ${line}`);
+  });
 
-    const onConnect = params => setEdges(eds => addEdge(params, eds));
-
-    return h('div', { style: { height: '100vh' } },
-      h(ReactFlow, {
-        nodes,
-        edges,
-        onNodesChange,
-        onEdgesChange,
-        onConnect,
-        fitView: true
-      },
-        h(MiniMap),
-        h(Controls),
-        h(Background)
-      )
-    );
-  }
-
-  ReactDOM.createRoot(document.getElementById('root')).render(h(App));
-})();
-</script>
-</body>
-</html>
+  return { nodes, edges };
+}
