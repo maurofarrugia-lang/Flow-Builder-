@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flow Builder – Parser Demo</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      resize: vertical;
+    }
+
+    button {
+      margin-top: 1rem;
+      padding: 0.7rem 1.4rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      background: #0078ff;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: #005fcc;
+    }
+
+    pre {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #1e1e1e;
+      color: #e6e6e6;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Flow Builder – Text Parser</h1>
+  <p>Enter your flow description below and click <strong>Parse</strong>.</p>
+
+  <textarea id="flowInput" placeholder="Example:
+START
+PROCESS: Validate input
+DECISION: Is valid?
+YES: Save to DB
+NO: Show error
+END"></textarea>
+
+  <button id="parseBtn">Parse</button>
+
+  <pre id="output"></pre>
+
+  <script>
+    // --- Unique, cleaned-up version of your parser ---
+    function parseToFlow(text) {
+      const lines = text
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+
+      const nodes = [];
+      const edges = [];
+
+      let lastNode = null;
+      let lastDecision = null;
+
+      lines.forEach((line, index) => {
+        const id = "n" + index;
+
+        if (line === "START") {
+          nodes.push({ id, type: "start", data: { label: "Start" } });
+          lastNode = id;
+          return;
+        }
+
+        if (line === "END") {
+          nodes.push({ id, type: "end", data: { label: "End" } });
+          if (lastNode) {
+            edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+          }
+          return;
+        }
+
+        if (line.startsWith("PROCESS:")) {
+          const label = line.replace("PROCESS:", "").trim();
+          nodes.push({ id, type: "process", data: { label } });
+
+          if (lastNode) {
+            edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+          }
+
+          lastNode = id;
+          return;
+        }
+
+        if (line.startsWith("DECISION:")) {
+          const label = line.replace("DECISION:", "").trim();
+          nodes.push({ id, type: "decision", data: { label } });
+
+          if (lastNode) {
+            edges.push({ id: `e-${lastNode}-${id}`, source: lastNode, target: id });
+          }
+
+          lastDecision = id;
+          lastNode = id;
+          return;
+        }
+
+        if (line.startsWith("YES:")) {
+          if (!lastDecision) throw new Error("YES found without a DECISION");
+
+          const label = line.replace("YES:", "").trim();
+          const branchId = id + "_yes";
+
+          nodes.push({ id: branchId, type: "process", data: { label } });
+          edges.push({
+            id: `yes-${lastDecision}-${branchId}`,
+            source: lastDecision,
+            target: branchId,
+            label: "YES"
+          });
+
+          return;
+        }
+
+        if (line.startsWith("NO:")) {
+          if (!lastDecision) throw new Error("NO found without a DECISION");
+
+          const label = line.replace("NO:", "").trim();
+          const branchId = id + "_no";
+
+          nodes.push({ id: branchId, type: "process", data: { label } });
+          edges.push({
+            id: `no-${lastDecision}-${branchId}`,
+            source: lastDecision,
+            target: branchId,
+            label: "NO"
+          });
+
+          return;
+        }
+
+        throw new Error("Invalid line: " + line);
+      });
+
+      return { nodes, edges };
+    }
+
+    // --- UI Logic ---
+    document.getElementById("parseBtn").addEventListener("click", () => {
+      const text = document.getElementById("flowInput").value;
+      const output = document.getElementById("output");
+
+      try {
+        const result = parseToFlow(text);
+        output.textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        output.textContent = "Error: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
