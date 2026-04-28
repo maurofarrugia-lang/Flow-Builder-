@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IPA Flow Builder — React Flow v10 (Stable)</title>
+
+  <!-- React Flow v10 CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/react-flow-renderer@10.3.17/dist/style.css" />
+
+  <!-- React 18 UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- ✅ React Flow v10 UMD (stable global: window.ReactFlow) -->
+  <script src="https://unpkg.com/react-flow-renderer@10.3.17/dist/umd/index.js"></script>
+
+  <style>
+    html, body, #root { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #f8fafc;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+(function () {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const RF = window.ReactFlow;
+
+  if (!React || !ReactDOM || !RF) {
+    document.getElementById('root').innerHTML = '<div style="padding:16px;color:#b91c1c">React Flow v10 failed to load.</div>';
+    return;
+  }
+
+  const h = React.createElement;
+
+  const {
+    ReactFlow,
+    Controls,
+    MiniMap,
+    Background,
+    addEdge,
+    useNodesState,
+    useEdgesState
+  } = RF;
+
+  function App() {
+    const [nodes, , onNodesChange] = useNodesState([
+      { id: '1', data: { label: 'Start' }, position: { x: 100, y: 100 }, type: 'input' },
+      { id: '2', data: { label: 'Interview' }, position: { x: 350, y: 100 } },
+      { id: '3', data: { label: 'Decision' }, position: { x: 600, y: 100 } }
+    ]);
+
+    const [edges, setEdges, onEdgesChange] = useEdgesState([
+      { id: 'e1-2', source: '1', target: '2', type: 'smoothstep' },
+      { id: 'e2-3', source: '2', target: '3', type: 'smoothstep' }
+    ]);
+
+    const onConnect = params => setEdges(eds => addEdge(params, eds));
+
+    return h('div', { style: { height: '100vh' } },
+      h(ReactFlow, {
+        nodes,
+        edges,
+        onNodesChange,
+        onEdgesChange,
+        onConnect,
+        fitView: true
+      },
+        h(MiniMap),
+        h(Controls),
+        h(Background)
+      )
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+})();
+</script>
+</body>
+</html>
