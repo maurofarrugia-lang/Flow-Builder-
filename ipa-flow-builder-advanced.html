@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IPA Flow Builder (Single-File)</title>
+
+  <!-- React Flow v11 (UMD) + styles via jsDelivr. citeturn4search100 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.min.css" />
+
+  <!-- html2canvas CDN for DOM capture. citeturn4search71 -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- jsPDF UMD CDN (use window.jspdf.jsPDF). citeturn4search91turn4search92 -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+
+  <!-- React 18 UMD -->
+  <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- React Flow v11 UMD bundle. citeturn4search100 -->
+  <script defer src="https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/umd/index.min.js"></script>
+
+  <!-- Babel for in-browser JSX (single-file convenience) -->
+  <script defer src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --shadow: 0 10px 25px rgba(2, 6, 23, .08);
+      --radius: 18px;
+    }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+
+    .app { height: 100vh; display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: 12px; box-sizing: border-box; }
+
+    .topbar {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .title h1 { font-size: 18px; margin: 0; }
+    .title p { font-size: 13px; margin: 4px 0 0 0; color: var(--muted); }
+
+    .btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: .12s ease;
+      user-select: none;
+      line-height: 1;
+    }
+    .btn:hover { background: #f1f5f9; }
+    .btn.primary { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .btn.primary:hover { background: #111c33; }
+    .btn.danger { background: #fff; color: #b91c1c; border-color: #fecaca; }
+    .btn.danger:hover { background: #fff1f2; }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+    .layout { height: 100%; display: grid; grid-template-columns: 360px 1fr; gap: 10px; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
+
+    .left {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      overflow: auto;
+    }
+
+    .section { border: 1px solid var(--border); border-radius: 16px; padding: 12px; }
+    .section + .section { margin-top: 10px; }
+
+    .section h3 { margin: 0; font-size: 14px; }
+    .section .hint { margin-top: 4px; font-size: 12px; color: var(--muted); }
+
+    textarea {
+      margin-top: 10px;
+      width: 100%;
+      height: 140px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 13px;
+      background: #f8fafc;
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+    .right {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      min-height: 420px;
+    }
+
+    .canvasWrap { height: 100%; width: 100%; }
+
+    /* IPA node styles */
+    .ipa-node {
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 10px 12px;
+      min-width: 160px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(2,6,23,.06);
+    }
+    .ipa-node .kind {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: rgba(15,23,42,.65);
+      font-weight: 600;
+    }
+    .ipa-node .label { font-size: 14px; font-weight: 700; margin-top: 4px; }
+
+    .k-start { background: #ecfdf5; border-color: #6ee7b7; color: #064e3b; border-radius: 999px; }
+    .k-end { background: #fff1f2; border-color: #fda4af; color: #881337; border-radius: 999px; }
+    .k-interview { background: #f0fdfa; border-color: #5eead4; color: #134e4a; }
+    .k-appeal { background: #fffbeb; border-color: #fcd34d; color: #78350f; }
+    .k-decision { background: #eef2ff; border-color: #a5b4fc; color: #312e81; }
+
+    .decision-wrap { transform: rotate(45deg); width: 180px; height: 100px; display: flex; align-items: center; justify-content: center; }
+    .decision-inner { transform: rotate(-45deg); width: 100%; }
+
+    .editInput {
+      margin-top: 6px;
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 6px 8px;
+      font-size: 13px;
+      outline: none;
+      background: rgba(255,255,255,.75);
+    }
+    .tiny { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+    /* Hide React Flow attribution in audit exports */
+    .react-flow__attribution { display: none; }
+
+    /* Print: hide toolbars */
+    @media print {
+      .topbar, .left { display: none !important; }
+      .layout { grid-template-columns: 1fr !important; }
+      body { background: #fff; }
+      .right { box-shadow: none; border: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Wait until all deferred scripts are loaded
+    (function boot() {
+      const ready = () => window.React && window.ReactDOM && window.ReactFlow && window.html2canvas && window.jspdf;
+      const tick = () => {
+        if (!ready()) return setTimeout(tick, 50);
+        startApp();
+      };
+      tick();
+
+      function startApp() {
+        const React = window.React;
+        const ReactDOM = window.ReactDOM;
+        const RF = window.ReactFlow;
+
+        // React Flow UMD exports can be nested; be defensive.
+        const ReactFlowComp = RF.default || RF.ReactFlow || RF;
+        const {
+          addEdge,
+          MiniMap,
+          Controls,
+          Background,
+          Handle,
+          Position,
+          ReactFlowProvider,
+          useNodesState,
+          useEdgesState,
+          useReactFlow,
+        } = RF;
+
+        const { jsPDF } = window.jspdf; // as per CDN usage guidance
+
+        const kindTheme = {
+          start: 'k-start',
+          end: 'k-end',
+          process: '',
+          interview: 'k-interview',
+          decision: 'k-decision',
+          appeal: 'k-appeal',
+        };
+
+        function inferKind(label) {
+          const l = String(label || '').toLowerCase();
+          if (l === 'start' || l.startsWith('start')) return 'start';
+          if (l === 'end' || l.startsWith('end')) return 'end';
+          if (l.includes('interview')) return 'interview';
+          if (l.includes('appeal')) return 'appeal';
+          if (l.includes('decision') || l.includes('approve') || l.includes('refuse')) return 'decision';
+          return 'process';
+        }
+
+        // --- Custom IPA node ---
+        function IpaNode({ id, data, selected, isConnectable }) {
+          const kind = data?.kind || 'process';
+          const label = data?.label || 'Untitled';
+          const editable = !!data?.editable;
+          const onLabelChange = data?.onLabelChange;
+
+          const [editing, setEditing] = React.useState(false);
+          const [draft, setDraft] = React.useState(label);
+
+          React.useEffect(() => setDraft(label), [label]);
+
+          const cls = `ipa-node ${kindTheme[kind] || ''} ${selected ? 'selected' : ''}`;
+
+          const content = (
+            <div className={cls}>
+              <Handle type="target" position={Position.Left} isConnectable={isConnectable && editable} />
+              <Handle type="source" position={Position.Right} isConnectable={isConnectable && editable} />
+
+              <div className="kind">{kind}</div>
+
+              {!editing ? (
+                <div className="label" onDoubleClick={() => editable && setEditing(true)} title={editable ? 'Double‑click to edit' : 'Read‑only'}>
+                  {label}
+                </div>
+              ) : (
+                <div>
+                  <input
+                    className="editInput nodrag"
+                    value={draft}
+                    autoFocus
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setEditing(false);
+                        onLabelChange && onLabelChange(id, (draft || '').trim() || 'Untitled');
+                      }
+                      if (e.key === 'Escape') {
+                        setEditing(false);
+                        setDraft(label);
+                      }
+                    }}
+                    onBlur={() => {
+                      setEditing(false);
+                      onLabelChange && onLabelChange(id, (draft || '').trim() || 'Untitled');
+                    }}
+                  />
+                  <div className="tiny">Enter to save • Esc to cancel</div>
+                </div>
+              )}
+            </div>
+          );
+
+          if (kind === 'decision') {
+            return (
+              <div className="decision-wrap">
+                <div className="decision-inner">{content}</div>
+              </div>
+            );
+          }
+
+          return content;
+        }
+
+        const nodeTypes = { ipa: IpaNode };
+
+        // --- Text → Flow parser (simple, admin-friendly) ---
+        function parseTextToFlow(text) {
+          const lines = String(text || '')
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+
+          const nodesByLabel = new Map();
+          const edges = [];
+
+          const ensureNode = (label) => {
+            if (nodesByLabel.has(label)) return nodesByLabel.get(label);
+            const id = String(nodesByLabel.size + 1);
+            const node = {
+              id,
+              type: 'ipa',
+              position: { x: 0, y: 0 },
+              data: { label, kind: inferKind(label) },
+            };
+            nodesByLabel.set(label, node);
+            return node;
+          };
+
+          lines.forEach((line, row) => {
+            const parts = line.split(/\s*->\s*/).map((p) => p.trim()).filter(Boolean);
+            for (let i = 0; i < parts.length; i++) {
+              ensureNode(parts[i]);
+              if (i > 0) {
+                const a = ensureNode(parts[i - 1]);
+                const b = ensureNode(parts[i]);
+                edges.push({ id: `e${a.id}-${b.id}-${row}-${i}`, source: a.id, target: b.id, type: 'smoothstep' });
+              }
+            }
+          });
+
+          // lightweight column layout by edge relaxation
+          const nodes = Array.from(nodesByLabel.values());
+          const level = new Map(nodes.map((n) => [n.id, 0]));
+          for (let k = 0; k < 10; k++) {
+            edges.forEach((e) => {
+              const l1 = level.get(e.source) || 0;
+              const l2 = level.get(e.target) || 0;
+              if (l2 < l1 + 1) level.set(e.target, l1 + 1);
+            });
+          }
+
+          const columns = new Map();
+          nodes.forEach((n) => {
+            const l = level.get(n.id) || 0;
+            if (!columns.has(l)) columns.set(l, []);
+            columns.get(l).push(n);
+          });
+
+          const colGap = 260;
+          const rowGap = 120;
+          [...columns.entries()].forEach(([col, colNodes]) => {
+            colNodes.forEach((n, idx) => {
+              n.position = { x: col * colGap + 40, y: idx * rowGap + 60 };
+            });
+          });
+
+          return { nodes, edges };
+        }
+
+        // --- App ---
+        function App() {
+          const [editable, setEditable] = React.useState(true);
+
+          const [builderText, setBuilderText] = React.useState(
+            'Start -> Registration -> Interview -> Decision\nDecision -> Appeal\nDecision -> End'
+          );
+
+          const initial = React.useMemo(() => {
+            // Try hash, then localStorage, then default.
+            const fromHash = readFromHash();
+            if (fromHash) return fromHash;
+            const saved = readFromLocal();
+            if (saved) return saved;
+            return parseTextToFlow(builderText);
+          }, []);
+
+          const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
+          const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+
+          const [selectedNodeId, setSelectedNodeId] = React.useState(null);
+
+          const { fitView, getNodes, getEdges, setViewport } = useReactFlow();
+
+          // Inject callbacks into node data
+          React.useEffect(() => {
+            setNodes((nds) =>
+              nds.map((n) => ({
+                ...n,
+                type: 'ipa',
+                data: {
+                  ...n.data,
+                  editable,
+                  onLabelChange: (id, newLabel) => {
+                    setNodes((curr) => curr.map((x) => (x.id === id ? { ...x, data: { ...x.data, label: newLabel } } : x)));
+                  },
+                },
+              }))
+            );
+          }, [editable]);
+
+          // Auto-save (debounced)
+          React.useEffect(() => {
+            const t = setTimeout(() => {
+              try {
+                localStorage.setItem('ipaFlowState', JSON.stringify({ nodes: getNodes(), edges: getEdges() }));
+              } catch {}
+            }, 250);
+            return () => clearTimeout(t);
+          }, [nodes, edges]);
+
+          const onConnect = React.useCallback(
+            (params) => setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds)),
+            [setEdges]
+          );
+
+          const onSelectionChange = React.useCallback(({ nodes: sel }) => {
+            setSelectedNodeId(sel?.[0]?.id ?? null);
+          }, []);
+
+          const buildFromText = () => {
+            const { nodes: newNodes, edges: newEdges } = parseTextToFlow(builderText);
+            setNodes(newNodes);
+            setEdges(newEdges);
+            setTimeout(() => fitView({ padding: 0.25, duration: 200 }), 30);
+          };
+
+          const addNode = (kind) => {
+            const id = String(Date.now());
+            const label =
+              kind === 'decision' ? 'Decision' :
+              kind === 'interview' ? 'Interview' :
+              kind === 'appeal' ? 'Appeal' :
+              kind === 'start' ? 'Start' :
+              kind === 'end' ? 'End' :
+              'Process';
+
+            setNodes((nds) => [
+              ...nds,
+              { id, type: 'ipa', position: { x: 80, y: 80 + nds.length * 80 }, data: { label, kind } },
+            ]);
+          };
+
+          const setKindForSelected = (kind) => {
+            if (!selectedNodeId) return;
+            setNodes((nds) => nds.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...n.data, kind } } : n)));
+          };
+
+          const deleteSelected = () => {
+            if (!selectedNodeId) return;
+            setNodes((nds) => nds.filter((n) => n.id !== selectedNodeId));
+            setEdges((eds) => eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
+            setSelectedNodeId(null);
+          };
+
+          const exportJSON = () => {
+            const payload = {
+              version: 1,
+              createdAt: new Date().toISOString(),
+              nodes: getNodes(),
+              edges: getEdges(),
+            };
+            downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), 'ipa-flow.json');
+          };
+
+          const importJSON = async (file) => {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (data?.nodes && data?.edges) {
+              setNodes(data.nodes);
+              setEdges(data.edges);
+              setTimeout(() => fitView({ padding: 0.25, duration: 200 }), 30);
+            }
+          };
+
+          const copyShareLink = () => {
+            const payload = { v: 1, nodes: getNodes(), edges: getEdges() };
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+            const url = `${location.origin}${location.pathname}#flow=${encoded}`;
+            if (navigator.clipboard?.writeText) {
+              navigator.clipboard.writeText(url);
+            } else {
+              prompt('Copy link:', url);
+            }
+          };
+
+          async function exportPNG() {
+            // Capture the flow wrapper (includes nodes+edges)
+            const root = document.querySelector('.right');
+            if (!root) return;
+            fitView({ padding: 0.25, duration: 0 });
+            await new Promise((r) => requestAnimationFrame(r));
+            const canvas = await window.html2canvas(root, { backgroundColor: '#ffffff', scale: 2 });
+            const url = canvas.toDataURL('image/png');
+            downloadURL(url, 'ipa-flow.png');
+          }
+
+          async function exportPDF() {
+            const root = document.querySelector('.right');
+            if (!root) return;
+            fitView({ padding: 0.25, duration: 0 });
+            await new Promise((r) => requestAnimationFrame(r));
+
+            const canvas = await window.html2canvas(root, { backgroundColor: '#ffffff', scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+
+            // Header band (AMIF/audit-style)
+            pdf.setFillColor(245, 247, 250);
+            pdf.rect(0, 0, pageW, 18, 'F');
+            pdf.setTextColor(15, 23, 42);
+            pdf.setFontSize(11);
+            pdf.text('IPA Flow Diagram (Export)', 10, 11);
+            pdf.setFontSize(9);
+            pdf.setTextColor(71, 85, 105);
+            pdf.text(new Date().toLocaleString(), pageW - 10, 11, { align: 'right' });
+
+            const margin = 8;
+            const imgX = margin;
+            const imgY = 22;
+            const imgW = pageW - margin * 2;
+            const imgH = pageH - imgY - margin;
+
+            pdf.addImage(imgData, 'PNG', imgX, imgY, imgW, imgH);
+            pdf.save('ipa-flow.pdf');
+          }
+
+          // helpers
+          function downloadURL(url, filename) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }
+
+          function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            downloadURL(url, filename);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+          }
+
+          function readFromHash() {
+            const hash = location.hash || '';
+            const m = hash.match(/flow=([^&]+)/);
+            if (!m) return null;
+            try {
+              const decoded = decodeURIComponent(escape(atob(m[1])));
+              const data = JSON.parse(decoded);
+              if (data?.nodes && data?.edges) return { nodes: data.nodes, edges: data.edges };
+            } catch {}
+            return null;
+          }
+
+          function readFromLocal() {
+            try {
+              const raw = localStorage.getItem('ipaFlowState');
+              if (!raw) return null;
+              const data = JSON.parse(raw);
+              if (data?.nodes && data?.edges) return data;
+            } catch {}
+            return null;
+          }
+
+          return (
+            <div className="app">
+              <div className="topbar">
+                <div className="title">
+                  <h1>IPA Flow Builder (Single-File HTML)</h1>
+                  <p>Text → Flow • IPA-styled nodes • Read-only mode • Export PNG/PDF • Share link • Import/Export JSON</p>
+                </div>
+
+                <div className="btnrow">
+                  <button className={"btn " + (editable ? "primary" : "")} onClick={() => setEditable((v) => !v)}>
+                    {editable ? 'Editing: ON' : 'Read-only'}
+                  </button>
+                  <button className="btn" onClick={exportPNG}>Export PNG</button>
+                  <button className="btn" onClick={exportPDF}>Export PDF</button>
+                  <button className="btn" onClick={exportJSON}>Export JSON</button>
+
+                  <label className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    Import JSON
+                    <input
+                      type="file"
+                      accept="application/json"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const f = e.target.files && e.target.files[0];
+                        if (f) importJSON(f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+
+                  <button className="btn" onClick={copyShareLink}>Copy Share Link</button>
+                </div>
+              </div>
+
+              <div className="layout">
+                <div className="left">
+                  <div className="section">
+                    <h3>🧠 Text → Flow auto-builder</h3>
+                    <div className="hint">One line per path. Use <b>-></b> between steps. Repeat a start node for branches.</div>
+                    <textarea value={builderText} onChange={(e) => setBuilderText(e.target.value)} />
+                    <div className="btnrow">
+                      <button className="btn primary" onClick={buildFromText}>Build</button>
+                      <button className="btn" onClick={() => { localStorage.removeItem('ipaFlowState'); location.hash=''; location.reload(); }}>Reset</button>
+                    </div>
+                    <div className="tiny">Tip: Words like “Interview”, “Decision”, “Appeal” auto-style nodes.</div>
+                  </div>
+
+                  <div className="section" style={{ marginTop: 10 }}>
+                    <h3>🏷 IPA-styled node palette</h3>
+                    <div className="grid2">
+                      <button className="btn" onClick={() => addNode('start')}>+ Start</button>
+                      <button className="btn" onClick={() => addNode('end')}>+ End</button>
+                      <button className="btn" onClick={() => addNode('process')}>+ Process</button>
+                      <button className="btn" onClick={() => addNode('interview')}>+ Interview</button>
+                      <button className="btn" onClick={() => addNode('decision')}>+ Decision</button>
+                      <button className="btn" onClick={() => addNode('appeal')}>+ Appeal</button>
+                    </div>
+                    <div className="tiny">Double-click a node label to edit (when Editing is ON). Double-click an edge to delete.</div>
+                  </div>
+
+                  <div className="section" style={{ marginTop: 10 }}>
+                    <h3>🔐 Selection tools</h3>
+                    <div className="hint">Selected: <b>{selectedNodeId || 'None'}</b></div>
+                    <div className="grid3">
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('process')}>Process</button>
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('interview')}>Interview</button>
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('decision')}>Decision</button>
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('appeal')}>Appeal</button>
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('start')}>Start</button>
+                      <button className="btn" disabled={!selectedNodeId || !editable} onClick={() => setKindForSelected('end')}>End</button>
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      <button className="btn danger" disabled={!selectedNodeId || !editable} onClick={deleteSelected}>Delete Selected</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="right">
+                  <div className="canvasWrap">
+                    <ReactFlowComp
+                      nodes={nodes}
+                      edges={edges}
+                      nodeTypes={nodeTypes}
+                      onNodesChange={onNodesChange}
+                      onEdgesChange={onEdgesChange}
+                      onConnect={editable ? onConnect : undefined}
+                      onSelectionChange={onSelectionChange}
+                      nodesConnectable={editable}
+                      nodesDraggable={editable}
+                      elementsSelectable={editable}
+                      fitView
+                      defaultEdgeOptions={{ type: 'smoothstep' }}
+                      onEdgeDoubleClick={(evt, edge) => {
+                        if (!editable) return;
+                        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+                      }}
+                    >
+                      <MiniMap pannable zoomable />
+                      <Controls />
+                      <Background gap={18} color="#e2e8f0" />
+                    </ReactFlowComp>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        function Root() {
+          return (
+            <ReactFlowProvider>
+              <App />
+            </ReactFlowProvider>
+          );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+      }
+    })();
+  </script>
+</body>
+</html>
